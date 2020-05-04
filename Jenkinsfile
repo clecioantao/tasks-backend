@@ -1,23 +1,30 @@
 pipeline {
     agent any
+
+
+	
+    tools {
+       maven "M2_HOME"
+    }	
+
     stages {
         stage ('Build Backend') {
             steps {
-                bat 'mvn clean package -DskipTests=true'
+                sh 'mvn clean package -DskipTests=true'
             }
         }
         stage ('Unit Tests') {
             steps {
-                bat 'mvn test'
+                sh 'mvn test'
             }
         }
         stage ('Sonar Analysis') {
             environment {
-                scannerHome = tool 'SONAR_SCANNER'
+                scannerHome = tool 'sonar_scanner'
             }
             steps {
                 withSonarQubeEnv('SONAR_LOCAL') {
-                    bat "${scannerHome}/bin/sonar-scanner -e -Dsonar.projectKey=DeployBack -Dsonar.host.url=http://localhost:9000 -Dsonar.login=cf6826d57f1e453e08ecbd6cf862496472061f66 -Dsonar.java.binaries=target -Dsonar.coverage.exclusions=**/.mvn/**,**/src/test/**,**/model/**,**Application.java"
+                    sh "${scannerHome}/bin/sonar-scanner -e -Dsonar.projectKey=DeployBack -Dsonar.host.url=http://192.168.0.32:9000 -Dsonar.login=4c5f2a81177d460fff32d649595d3a8206ff88ba -Dsonar.java.binaries=target -Dsonar.coverage.exclusions=**/.mvn/**,**/src/test/**,**/model/**,**Application.java"
                 }
             }
         }
@@ -29,47 +36,51 @@ pipeline {
                 }
             }
         }
+
         stage ('Deploy Backend') {
             steps {
-                deploy adapters: [tomcat8(credentialsId: 'TomcatLogin', path: '', url: 'http://localhost:8001/')], contextPath: 'tasks-backend', war: 'target/tasks-backend.war'
+                deploy adapters: [tomcat8(credentialsId: 'novo_tomcat', path: '', url: 'http://192.168.0.33:8001/')], contextPath: 'tasks-backend', war: 'target/tasks-backend.war'
             }
         }
         stage ('API Test') {
             steps {
                 dir('api-test') {
-                    git credentialsId: 'github_login', url: 'https://github.com/wcaquino/tasks-api-test'
-                    bat 'mvn test'
+                    git credentialsId: 'github_login', url: 'https://github.com/clecioantao/tasks-api-test'
+                    sh 'mvn test'
                 }
             }
         }
         stage ('Deploy Frontend') {
             steps {
                 dir('frontend') {
-                    git credentialsId: 'github_login', url: 'https://github.com/wcaquino/tasks-frontend'
-                    bat 'mvn clean package'
-                    deploy adapters: [tomcat8(credentialsId: 'TomcatLogin', path: '', url: 'http://localhost:8001/')], contextPath: 'tasks', war: 'target/tasks.war'
+                    git credentialsId: 'github_login', url: 'https://github.com/clecioantao/tasks-frontend'
+                    sh 'mvn clean package'
+                    deploy adapters: [tomcat8(credentialsId: 'novo_tomcat', path: '', url: 'http://192.168.0.33:8001/')], contextPath: 'tasks', war: 'target/tasks.war'
                 }
             }
         }
         stage ('Functional Test') {
             steps {
                 dir('functional-test') {
-                    git credentialsId: 'github_login', url: 'https://github.com/wcaquino/tasks-functional-tests'
-                    bat 'mvn test'
+                    git credentialsId: 'github', url: 'https://github.com/clecioantao/tasks-functional-test' 
+                    sh 'mvn test'
                 }
             }
         }
+
         stage('Deploy Prod') {
             steps {
-                bat 'docker-compose build'
-                bat 'docker-compose up -d'
+                script {
+                   sh '/usr/local/bin/docker-compose -f /var/lib/jenkins/workspace/TestandoPipeline/docker-compose.yml up -d'
+                }
             }
         }
+  
         stage ('Health Check') {
             steps {
-                sleep(5)
+                sleep(15)
                 dir('functional-test') {
-                    bat 'mvn verify -Dskip.surefire.tests'
+                    sh 'mvn verify -Dskip.surefire.tests'
                 }
             }
         }
@@ -80,12 +91,10 @@ pipeline {
             archiveArtifacts artifacts: 'target/tasks-backend.war, frontend/target/tasks.war', onlyIfSuccessful: true
         }
         unsuccessful {
-            emailext attachLog: true, body: 'See the attached log below', subject: 'Build $BUILD_NUMBER has failed', to: 'wcaquino+jenkins@gmail.com'
+            emailext attachLog: true, body: 'See the attached log below', subject: 'Build $BUILD_NUMBER has failed', to: 'clecioa.antao@gmail.com'
         }
         fixed {
-            emailext attachLog: true, body: 'See the attached log below', subject: 'Build is fine!!!', to: 'wcaquino+jenkins@gmail.com'
+            emailext attachLog: true, body: 'See the attached log below', subject: 'Build is fine!!!', to: 'clecioa.antao@gmail.com'
         }
     }
 }
-
-

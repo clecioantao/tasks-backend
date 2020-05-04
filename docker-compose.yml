@@ -19,7 +19,7 @@ services:
       context: .
       args:
         - WAR_FILE=target/tasks-backend.war
-        - CONTEXT=tasks-backend
+        - CONTEXT=tasks-backend.war
     networks:
       - prod_net_back
       - prod_net_front
@@ -41,11 +41,11 @@ services:
         context: .
         args:
           - WAR_FILE=frontend/target/tasks.war
-          - CONTEXT=tasks
+          - CONTEXT=tasks.war
     networks:
       - prod_net_front
     ports:
-      - 9999:8080
+      - 8003:8080
     environment:
       - BACKEND_HOST=backend
       - BACKEND_PORT=8080
